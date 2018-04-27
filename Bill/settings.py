@@ -53,7 +53,7 @@ CONCURRENT_REQUESTS = 1
 # Configure a delay for requests for the same website (default: 0)
 # See https://doc.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-DOWNLOAD_DELAY = 5
+DOWNLOAD_DELAY = 3
 # 随机延时
 RANDOMIZE_DOWNLOAD_DELAY = True
 
@@ -105,6 +105,7 @@ DOWNLOADER_MIDDLEWARES = {
 # See https://doc.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
    'Bill.pipelines.BillPipeline': 300,
+   # 'Bill.pipelines.TwistedBillPipeline': 301,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
