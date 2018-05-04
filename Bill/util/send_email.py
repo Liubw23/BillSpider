@@ -12,7 +12,6 @@ class EmailSender(object):
         self.sender = 'liubowen@purang.com'        # 发送人
         self.receivers = [
                             'liubowen@purang.com',
-                            '15670356867@163.com',
                           ]                        # 接收人
 
     def send(self, title, content):
@@ -32,5 +31,6 @@ class EmailSender(object):
 
 
 if __name__ == '__main__':
-    EmailSender().send('爬虫名+时间+异常', '爬虫名+异常原因+时间+代码位置')
+    pass
+    # EmailSender().send('爬虫名+时间+异常', '爬虫名+异常原因+时间+代码位置')
 
