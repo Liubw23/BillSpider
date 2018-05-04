@@ -93,6 +93,7 @@ DOWNLOADER_MIDDLEWARES = {
    # 'Bill.middlewares.BillDownloaderMiddleware': 543,
     'Bill.middlewares.RandomUserAgentMiddleware': 544,
     'Bill.middlewares.RzlineMiddleware': 545,
+    'Bill.middlewares.TcpjwMiddleware': 546,
 }
 
 # Enable or disable extensions

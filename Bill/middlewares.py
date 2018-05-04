@@ -9,6 +9,7 @@ from scrapy import signals
 import random
 import requests
 import json
+import time
 from scrapy.http import HtmlResponse
 
 from .settings import USER_AGENT_LIST
@@ -113,7 +114,7 @@ class RandomUserAgentMiddleware(object):
 
     def process_request(self, request, spider):
         user_agent = random.choice(USER_AGENT_LIST)
-        print('用户头：', user_agent)
+        # print('用户头：', user_agent)
         request.headers['User-Agent'] = user_agent
 
 
@@ -127,23 +128,52 @@ class RzlineMiddleware(object):
                     'http://www.rzline.com/web/mobuser/market/quoteShow',
                     'http://www.rzline.com/web/mobuser/market/quoteDetail',
                    ]
-        if request.url in url_list:
 
+        for url in url_list:
+            if url in request.url:
+
+                data = request.meta['data']
+                header = request.meta['header']
+                info = self._post(url, header, data)
+                return HtmlResponse(request.url,
+                                    encoding='utf-8',
+                                    body=info,
+                                    request=request)
+
+    @staticmethod
+    def _post(url, header, data):
+        response = requests.post(
+                                 url=url,
+                                 headers=header,
+                                 data=json.dumps(data),
+                                )
+        response = response.content
+        return response
+
+
+class TcpjwMiddleware(object):
+
+    def process_request(self, request, spider):
+
+        if spider.name != 'tcpjw':
+            return
+        url = 'https://www.tcpjw.com/OrderList/TradingCenter'
+        if url in request.url:
             data = request.meta['data']
             header = request.meta['header']
-            info = self._post(request.url, header, data)
-
+            info = self._post(url, header, data)
             return HtmlResponse(request.url,
                                 encoding='utf-8',
                                 body=info,
                                 request=request)
 
-    def _post(self, url, header, formdata):
-
+    @staticmethod
+    def _post(url, header, data):
         response = requests.post(
                                  url=url,
                                  headers=header,
-                                 data=json.dumps(formdata),
+                                 data=data,
+                                 verify=False,
                                 )
         response = response.content
         return response

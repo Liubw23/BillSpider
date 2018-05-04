@@ -2,6 +2,7 @@
 import hashlib
 import sys
 import traceback
+from Bill.util.send_email import EmailSender
 
 
 def get_uuid(s):
@@ -13,8 +14,8 @@ def get_uuid(s):
     md5 = hashlib.md5()
     s_en = s.encode()
     md5.update(s_en)
-    id = md5.hexdigest()
-    return id
+    uu_id = md5.hexdigest()
+    return uu_id
 
 
 def get_error_info(e):
@@ -28,7 +29,7 @@ def get_error_info(e):
 
     if info[2]:
 
-        for file, line_no, function, text in traceback.extract_tb(info[2]):
+        for file, line_no, func, text in traceback.extract_tb(info[2]):
             pos = file + " line " + str(line_no) + " in " + "{" + text + "}"
             error_info['pos'] = pos
             error_info['reason'] = e
@@ -41,5 +42,28 @@ def get_error_info(e):
     return error_info
 
 
+def trace_error(func):
+    """
+    a decorator for catching exception and sending email
+    :param func:
+    :return:
+    """
+    def wrap(*args, **kwargs):
+        try:
+            for i in func(*args, **kwargs):
+                yield i
+        except Exception as e:
+            # send email
+            name = str(func.__qualname__).split('.')[0]
+            title = '{} is abnormal'.format(name)
+            error_info = get_error_info(str(e))
+            content = 'Exception position：' + error_info['pos'] + '\n' + 'Exception reason：' + error_info['reason']
+            EmailSender().send(title, content)
+            # stop spider
+            from scrapy.exceptions import CloseSpider
+            raise CloseSpider(e)
+    return wrap
+
+
 if __name__ == '__main__':
-    print(get_uuid('霸州市农村信用合作联社,三农+1000.00万'))
+    pass

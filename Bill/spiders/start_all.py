@@ -1,5 +1,7 @@
 import time
 import os
+from scrapy import cmdline
+import sys
 import sched
 from multiprocessing import Pool
 
@@ -24,7 +26,7 @@ if __name__ == "__main__":
 
     start_time = time.time()
 
-    spiders = ['shendupj', 'tcpjw']
+    spiders = ['shendupj', 'rzline', 'exbill']
 
     p = Pool(len(spiders))
 

@@ -4,7 +4,6 @@ import re
 import time
 import json
 import requests
-from pymysql import NULL
 
 from Bill.items import *
 from Bill.util import misc
@@ -107,14 +106,14 @@ class ExbillSpider(scrapy.Spider):
 
             # F1-F13(F3-联系人,F14-联系方式)
             F1 = re_F1.search(raw_data)
-            item['F1'] = F1.group(1) if F1 else NULL
+            item['F1'] = F1.group(1) if F1 else None
 
             F2 = re_F2.search(data)
-            F2 = F2.group(1).replace('-', '').replace(':', '') if F2 else NULL
+            F2 = F2.group(1).replace('-', '').replace(':', '') if F2 else None
             item['F2'] = F2
 
             F3 = re_F3.search(raw_data)
-            F3 = F3.group(1).replace('un', 'UN') if F3 else NULL
+            F3 = F3.group(1).replace('un', 'UN') if F3 else None
             item['F3'] = F3
 
             item['F4'] = '出'
@@ -122,7 +121,7 @@ class ExbillSpider(scrapy.Spider):
             try:
                 F7 = data.split('***')[0] + ',' + data.split('***')[1][:2]
             except IndexError:
-                F7 = NULL
+                F7 = None
             item['F7'] = F7
 
             try:
@@ -134,7 +133,7 @@ class ExbillSpider(scrapy.Spider):
                 else:
                     F5 = '商票'
             except IndexError:
-                F5 = NULL
+                F5 = None
             item['F5'] = F5
 
             F8 = re_F8.search(data)
@@ -143,14 +142,14 @@ class ExbillSpider(scrapy.Spider):
                 F8 = '%.2f' % float(F8)
                 F8 = str(F8) + '万'
             else:
-                F8 = NULL
+                F8 = None
             item['F8'] = F8
 
             F9 = re_F9.search(data)
-            item['F9'] = F9.group() if F9 else NULL
+            item['F9'] = F9.group() if F9 else None
 
             F10 = re_F10.search(data)
-            item['F10'] = F10.group() if F10 else NULL
+            item['F10'] = F10.group() if F10 else None
 
             if (item['F8'] and float(item['F8'].replace('万', '')) >= 100) \
                     or (item['F10'] and int(item['F10'].replace('天', '')) >= 190):
@@ -159,10 +158,10 @@ class ExbillSpider(scrapy.Spider):
                 item['F6'] = ''
 
             F11 = re_F11.search(data)
-            item['F11'] = F11.group().replace('%', '') if F11 else NULL
+            item['F11'] = F11.group().replace('%', '') if F11 else None
 
             F12 = re_F12.search(data)
-            item['F12'] = F12.group() if F12 else NULL
+            item['F12'] = F12.group() if F12 else None
 
             item['F13'] = ''
 
@@ -199,8 +198,8 @@ class ExbillSpider(scrapy.Spider):
             item['F3'] = data['result']['userInfo']['name']
             item['F14'] = data['result']['userInfo']['mobile']
         except Exception as e:
-            item['F3'] = NULL
-            item['F14'] = NULL
+            item['F3'] = None
+            item['F14'] = None
             title = '爬虫' + self.name + '异常'
             error_info = misc.get_error_info(str(e))
             content = '异常位置：' + error_info['pos'] + '\n' + '异常原因：' + error_info['reason']

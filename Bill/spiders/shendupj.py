@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 import scrapy
 import time
-from pymysql import NULL
-
 from Bill.items import *
+from Bill.util import misc
 
 Today = time.strftime("%Y%m%d")
 Year = time.strftime("%Y")
@@ -21,7 +20,7 @@ class ShendupjSpider(scrapy.Spider):
             return
         page_size = 100
         pages = int(values) // page_size + 1
-        for page in range(1, 2):
+        for page in range(1, pages+1):
             print('正在爬取第{}页'.format(page))
             url = 'http://www.shendupiaoju.com/inde_draft?pageSize={}&pageNo={}&today=1' \
                   '&draftType=&bankClassification=&expiryDateRange=&amtRange=&draftStatus='\
@@ -31,6 +30,7 @@ class ShendupjSpider(scrapy.Spider):
             yield scrapy.Request(url,
                                  callback=self.parse_detail,
                                  dont_filter=True,
+                                 meta={'page': str(page)}
                                  )
 
     def parse_detail(self, response):
@@ -46,7 +46,7 @@ class ShendupjSpider(scrapy.Spider):
         n = 1
         for node in node_list:
 
-            print('*' * 10, n, '*' * 10)
+            print('*' * 10, '第'+response.meta['page']+'页', n, '*' * 10)
             n += 1
 
             item = BillItem()
@@ -55,7 +55,7 @@ class ShendupjSpider(scrapy.Spider):
             if F2:
                 F2 = Year + F2.replace(' ', '').replace(':', '').replace('/', '') + '00'
             else:
-                F2 = NULL
+                F2 = None
             item['F2'] = F2
 
             today = F2[:8]
@@ -63,6 +63,8 @@ class ShendupjSpider(scrapy.Spider):
                 print('日期：', today)
                 flag = 0
                 break
+
+            item['F3'] = None
 
             item['F4'] = '出'
 
@@ -72,7 +74,7 @@ class ShendupjSpider(scrapy.Spider):
             if F5:
                 F5 = F5.replace('\r\n', '').replace('\t', '')
             else:
-                F5 = NULL
+                F5 = ''
             item['F5'] = F5
 
             F7_1 = node.xpath('td[4]/text()').extract_first()
@@ -82,7 +84,7 @@ class ShendupjSpider(scrapy.Spider):
             elif F7_1:
                 F7 = F7_1
             else:
-                F7 = NULL
+                F7 = ''
             item['F7'] = F7
 
             F8 = node.xpath('td[5]/text()').extract_first()
@@ -91,11 +93,11 @@ class ShendupjSpider(scrapy.Spider):
                 F8 = '%.2f' % float(F8)
                 F8 = str(F8) + '万'
             else:
-                F8 = NULL
+                F8 = ''
             item['F8'] = F8
 
             F9 = node.xpath('td[6]/text()').extract_first()
-            item['F9'] = F9 if F9 else NULL
+            item['F9'] = F9 if F9 else ''
 
             if F9:
                 start = time.mktime(time.strptime(today, '%Y%m%d'))
@@ -103,7 +105,7 @@ class ShendupjSpider(scrapy.Spider):
                 F10 = int(end - start)//(24*60*60)
                 F10 = str(F10) + '天'
             else:
-                F10 = NULL
+                F10 = None
             item['F10'] = F10
 
             if (item['F8'] and float(item['F8'].replace('万', '')) >= 100) \
@@ -112,14 +114,22 @@ class ShendupjSpider(scrapy.Spider):
             else:
                 item['F6'] = ''
 
+            item['F11'] = None
+
             F12 = node.xpath('td[7]/span/text()').extract_first()
             if F12:
                 F12 = F12.replace('每十万扣款 ', '') + '元' if '竞价' not in F12 else F12
             else:
-                F12 = NULL
+                F12 = ''
             item['F12'] = F12
 
             item['F13'] = ''
+
+            item['F14'] = None
+
+            uu_str = item['F5'] + item['F7'] + item['F8'] + item['F9'] + item['F12']
+            uu_id = misc.get_uuid(uu_str)
+            item['F1'] = uu_id
 
             # FT, FV, FP, FU, FS
             FS = node.xpath('td[9]/a/text()').extract_first()
@@ -133,29 +143,5 @@ class ShendupjSpider(scrapy.Spider):
 
             item['FU'] = int(time.strftime("%Y%m%d%H%M%S"))
 
-
             print(item)
-
-
-# from scrapy.crawler import CrawlerProcess
-# from apscheduler.schedulers.blocking import BlockingScheduler
-# import multiprocessing
-# sched = BlockingScheduler()
-#
-#
-# def my_job():
-#     process = CrawlerProcess()
-#     process.crawl(ShendupjSpider)
-#     process.start()
-#
-#
-# @sched.scheduled_job('interval', seconds=10)
-# def run():
-#     process = multiprocessing.Process(target=my_job)
-#     process.start()
-#
-#
-# if __name__ == '__main__':
-#     sched.start()
-
-
+            yield item
