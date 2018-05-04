@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 
 # pycharm
-/.idea
+.idea/
 
 # C extensions
 *.so
