@@ -4,5 +4,7 @@
     <content url="file://$MODULE_DIR$" />
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module" module-name="Cha" />
+    <orderEntry type="module" module-name="IPProxyPool-1.0" />
   </component>
 </module>

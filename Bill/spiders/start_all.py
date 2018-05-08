@@ -17,7 +17,7 @@ def perform(inc, sche, spider):
 
 def main(spider):
     sche = sched.scheduler(time.time, time.sleep)
-    interval = 300
+    interval = 60*30
     sche.enter(0, 0, perform, (interval, sche, spider))
     sche.run()  # 开始运行，直到计划时间队列变成空为止
 

@@ -3,6 +3,7 @@ import scrapy
 import time
 from Bill.items import *
 from Bill.util import misc
+from Bill.util.misc import trace_error
 
 Today = time.strftime("%Y%m%d")
 Year = time.strftime("%Y")
@@ -13,19 +14,29 @@ class ShendupjSpider(scrapy.Spider):
     allowed_domains = ['shendupiaoju.com']
     start_urls = ['http://www.shendupiaoju.com/inde_draft?pageSize=15&pageNo=0&today=1']
 
+    custom_settings = {
+        'LOG_LEVEL': 'DEBUG',
+        'DOWNLOADER_MIDDLEWARES': {
+            'Bill.middlewares.RandomUserAgentMiddleware': 544,
+            # 'Bill.middlewares.RandomProxyMiddleware': 545,
+        }
+    }
+
+    @trace_error
     def parse(self, response):
         values = response.xpath('//*[@id="count"]/@value').extract_first()
+        print('总数量为：', values)
         if not values:
             print('出现异常')
             return
         page_size = 100
         pages = int(values) // page_size + 1
+        print('总页数为：', pages)
         for page in range(1, pages+1):
             print('正在爬取第{}页'.format(page))
             url = 'http://www.shendupiaoju.com/inde_draft?pageSize={}&pageNo={}&today=1' \
                   '&draftType=&bankClassification=&expiryDateRange=&amtRange=&draftStatus='\
                   .format(page_size, page)
-            print(url)
 
             yield scrapy.Request(url,
                                  callback=self.parse_detail,
@@ -33,6 +44,7 @@ class ShendupjSpider(scrapy.Spider):
                                  meta={'page': str(page)}
                                  )
 
+    @trace_error
     def parse_detail(self, response):
         node_list = response.xpath('//tr')
 
@@ -40,7 +52,9 @@ class ShendupjSpider(scrapy.Spider):
             print('节点列表为空, 重新发送请求！')
             yield scrapy.Request(response.url,
                                  callback=self.parse_detail,
-                                 dont_filter=True)
+                                 dont_filter=True,
+                                 meta={'page': response.meta['page']}
+                                 )
             return
 
         n = 1
@@ -55,14 +69,10 @@ class ShendupjSpider(scrapy.Spider):
             if F2:
                 F2 = Year + F2.replace(' ', '').replace(':', '').replace('/', '') + '00'
             else:
-                F2 = None
+                F2 = ''
             item['F2'] = F2
 
-            today = F2[:8]
-            if today != Today:
-                print('日期：', today)
-                flag = 0
-                break
+            today = item['F2'][:8]
 
             item['F3'] = None
 
@@ -99,13 +109,13 @@ class ShendupjSpider(scrapy.Spider):
             F9 = node.xpath('td[6]/text()').extract_first()
             item['F9'] = F9 if F9 else ''
 
-            if F9:
+            if F9 and today:
                 start = time.mktime(time.strptime(today, '%Y%m%d'))
                 end = time.mktime(time.strptime(F9.replace('/', ''), '%Y%m%d'))
                 F10 = int(end - start)//(24*60*60)
                 F10 = str(F10) + '天'
             else:
-                F10 = None
+                F10 = ''
             item['F10'] = F10
 
             if (item['F8'] and float(item['F8'].replace('万', '')) >= 100) \
@@ -132,12 +142,8 @@ class ShendupjSpider(scrapy.Spider):
             item['F1'] = uu_id
 
             # FT, FV, FP, FU, FS
-            FS = node.xpath('td[9]/a/text()').extract_first()
-            if FS:
-                FS = 1
-            else:
-                FS = 0
-            item['FS'] = FS
+            FS = ''.join(node.xpath('td[9]/text()').extract())
+            item['FS'] = 0 if '交易成功' in FS or '竞价' in item['F12'] else 1
 
             item['FP'] = int(time.strftime("%Y%m%d%H%M%S"))
 

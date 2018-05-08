@@ -5,15 +5,26 @@ import scrapy
 from copy import deepcopy
 from urllib.parse import urlencode
 
+from Bill.util import misc
 from Bill.items import BillItem
+from Bill.util.misc import trace_error
+
 
 Today = time.strftime("%Y%m%d")
+s_values = set()
 
 
 class ZaopiaowangSpider(scrapy.Spider):
     name = 'zaopiaowang'
     allowed_domains = ['zaopiaowang.com']
     start_urls = ['https://www.zaopiaowang.com/']
+
+    custom_settings = {
+        'DOWNLOADER_MIDDLEWARES': {
+                                    'Bill.middlewares.RandomUserAgentMiddleware': 544,
+                                    # 'Bill.middlewares.RandomProxyMiddleware': 545,
+                                  }
+    }
 
     base_url = "https://www.zaopiaowang.com/api/bill/search?"
     page_size = 100
@@ -47,6 +58,7 @@ class ZaopiaowangSpider(scrapy.Spider):
                                  callback=self.parse,
                                  meta={'index': 1, 'bankType': kind})
 
+    @trace_error
     def parse(self, response):
         json_data = json.loads(response.text)
 
@@ -58,6 +70,7 @@ class ZaopiaowangSpider(scrapy.Spider):
 
         n = 1
         flag = 1
+        values = list()
         for data in data_list:
             print(response.meta['bankType'], '*'*10, n, "*"*10)
             n += 1
@@ -83,7 +96,7 @@ class ZaopiaowangSpider(scrapy.Spider):
             kind = self.kind_dict[response.meta['bankType']]
             item['F7'] = data['cdCompanyName'] + ',' + kind if data['cdCompanyName'] else ''
 
-            item['F8'] = str(data['amount']) + '万' if data['amount'] else ''
+            item['F8'] = str('%.2f' % float(data['amount'])) + '万' if data['amount'] else ''
 
             F9 = data['billEndTime'] if data['billEndTime'] else ''
             item['F9'] = time.strftime("%Y/%m/%d", time.localtime(F9)) if F9 else ''
@@ -104,15 +117,25 @@ class ZaopiaowangSpider(scrapy.Spider):
 
             item['F14'] = None
 
+            uu_str = item['F7'] + item['F8'] + item['F9'] + str(item['F11']) + item['F12']
+            uu_id = misc.get_uuid(uu_str)
+            item['F1'] = self.name + '+' + uu_id
+
             # FT, FV, FP, FU, FS
-            item['FS'] = 0 if data['status'] == 9 else 1
+            item['FS'] = 0 if data['status'] == 9 or item['F12'] == '' else 1
 
             item['FP'] = int(time.strftime("%Y%m%d%H%M%S"))
 
             item['FU'] = int(time.strftime("%Y%m%d%H%M%S"))
 
-            print(item)
-            yield item
+            if item['F1'] not in s_values:
+                s_values.add(item['F1'])
+                values.append(item)
+
+        for item in values:
+            if item['F1'] in s_values:
+                print(item)
+                yield item
 
         if flag:
             formdata = deepcopy(self.formdata)

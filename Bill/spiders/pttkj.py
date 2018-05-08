@@ -16,6 +16,13 @@ class PttkjSpider(scrapy.Spider):
     allowed_domains = ['pttkj.net']
     start_urls = ['https://www.pttkj.net']
 
+    custom_settings = {
+        'DOWNLOADER_MIDDLEWARES': {
+            'Bill.middlewares.RandomUserAgentMiddleware': 544,
+            # 'Bill.middlewares.RandomProxyMiddleware': 545,
+        }
+    }
+
     base_url = 'https://www.pttkj.net/jsp/website/pjxgjson.cmdpage?method=getCpxxToIndex&opt=json&currentPage={page}'
 
     kind_dict = {
@@ -86,7 +93,7 @@ class PttkjSpider(scrapy.Spider):
             item['F14'] = None
 
             # FT, FV, FP, FU, FS
-            item['FS'] = 0 if data['pjjyzt'] == "8" else 1
+            item['FS'] = 0 if data['pjjyzt'] == "8" or item['F12'] == '' else 1
 
             item['FP'] = int(time.strftime("%Y%m%d%H%M%S"))
 

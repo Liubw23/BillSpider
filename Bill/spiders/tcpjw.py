@@ -20,9 +20,14 @@ class TcpjwSpider(scrapy.Spider):
     # 配置setting
     custom_settings = {
         'DOWNLOAD_DELAY': 3,
-        'LOG_LEVEL': 'ERROR',
+        'LOG_LEVEL': 'DEBUG',
         'HTTPERROR_ALLOWED_CODES': [400],
+        'DOWNLOADER_MIDDLEWARES': {
+            'Bill.middlewares.RandomUserAgentMiddleware': 544,
+            'Bill.middlewares.TcpjwMiddleware': 547,
+        }
     }
+
 
     headers = {
         "content-type": "application/x-www-form-urlencoded",
@@ -38,7 +43,7 @@ class TcpjwSpider(scrapy.Spider):
                  "3": ("三农", "银票"),
                  "4": ("财务公司", "财票"),
                  "6": ("村镇", "银票"),
-                 "7": ("外资", "商票"),
+                 "7": ("外资", "银票"),
                  "8": ("商票", "商票"),
                  }
 
@@ -62,7 +67,8 @@ class TcpjwSpider(scrapy.Spider):
         count = re.search(r'共 (.*?) 条记录', response.text)
         if count:
             count = count.group(1)
-            pages = int(count) // 20 + 1
+            size = 10
+            pages = int(count) // size + 1
         else:
             pages = 1
 
@@ -87,7 +93,7 @@ class TcpjwSpider(scrapy.Spider):
         if not node_list:
             raise EmptyNodeException
 
-        node_list = node_list[:-1] if len(node_list) == 21 else node_list
+        node_list = node_list[:-1]
 
         n = 1
         for node in node_list:
@@ -167,12 +173,8 @@ class TcpjwSpider(scrapy.Spider):
             item['F1'] = self.name + '+' + str(uu_id)
 
             # FT, FV, FP, FU, FS
-            FS = node.xpath('td[7]/a/text()').extract_first()
-            if FS:
-                FS = 1
-            else:
-                FS = 0
-            item['FS'] = FS
+            FS = ''.join(node.xpath('td[7]').extract()).replace('\r\n', '').replace(' ', '')
+            item['FS'] = 0 if '交易完成' in FS or '竞价' in item['F12'] else 1
 
             item['FP'] = int(time.strftime("%Y%m%d%H%M%S"))
 

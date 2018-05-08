@@ -8,11 +8,15 @@
 #     https://doc.scrapy.org/en/latest/topics/settings.html
 #     https://doc.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://doc.scrapy.org/en/latest/topics/spider-middleware.html
+import os
 
 BOT_NAME = 'Bill'
 
 SPIDER_MODULES = ['Bill.spiders']
 NEWSPIDER_MODULE = 'Bill.spiders'
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_DIR = os.path.join(BASE_DIR, 'log')
 
 # User-Agent
 USER_AGENT_LIST = [
@@ -40,6 +44,8 @@ MYSQL_PWD = "111111"
 MYSQL_DB_NAME = "pdb"
 MYSQL_TABLE = 'P14002'
 
+# 下载时间间隔
+DOWNLOAD_INTERVAL = 60*30
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'Bill (+http://www.yourdomain.com)'
@@ -92,8 +98,9 @@ HTTPERROR_ALLOWED_CODES = [403]
 DOWNLOADER_MIDDLEWARES = {
    # 'Bill.middlewares.BillDownloaderMiddleware': 543,
     'Bill.middlewares.RandomUserAgentMiddleware': 544,
-    'Bill.middlewares.RzlineMiddleware': 545,
-    'Bill.middlewares.TcpjwMiddleware': 546,
+    'Bill.middlewares.RandomProxyMiddleware': 545,
+    'Bill.middlewares.RzlineMiddleware': 546,
+    'Bill.middlewares.TcpjwMiddleware': 547,
 }
 
 # Enable or disable extensions

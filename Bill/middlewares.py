@@ -10,6 +10,7 @@ import random
 import requests
 import json
 import time
+import pymysql
 from scrapy.http import HtmlResponse
 
 from .settings import USER_AGENT_LIST
@@ -118,6 +119,31 @@ class RandomUserAgentMiddleware(object):
         request.headers['User-Agent'] = user_agent
 
 
+class RandomProxyMiddleware(object):
+
+    def __init__(self):
+        self.db = pymysql.connect('localhost', 'root', '1234', 'bill', charset='utf8')
+        self.cur = self.db.cursor()
+
+    def process_request(self, request, spider):
+        self.cur.execute(r"""select * from proxys order by rand() LIMIT 1""")
+        proxy = self.cur.fetchone()
+        ip, port = proxy[1], proxy[2]
+        proxys = str(ip) + ':' + str(port)
+        print('proxy：', proxys)
+        request.meta['proxy'] = r'http://' + proxys
+
+    def process_response(self, request, response, spider):
+        print('状态：', response.status)
+        if response.status != 200:
+            print('无效的proxy: ', request.meta['proxy'])
+        return response
+
+    def spider_closed(self, spider):
+        self.cur.close()
+        self.db.close()
+
+
 class RzlineMiddleware(object):
 
     def process_request(self, request, spider):
@@ -159,21 +185,28 @@ class TcpjwMiddleware(object):
             return
         url = 'https://www.tcpjw.com/OrderList/TradingCenter'
         if url in request.url:
+            proxys = request.meta['proxy'] if 'proxy' in request.meta else None
             data = request.meta['data']
             header = request.meta['header']
-            info = self._post(url, header, data)
+            info = self._post(url, header, data, proxys)
             return HtmlResponse(request.url,
                                 encoding='utf-8',
                                 body=info,
                                 request=request)
 
     @staticmethod
-    def _post(url, header, data):
+    def _post(url, header, data, proxy):
+        proxies = {
+            "http": "http://" + proxy.split('//')[1],
+            "https": "https://" + proxy.split('//')[1],
+        } if proxy else {}
+        print('requests post proxies: ', proxies)
         response = requests.post(
                                  url=url,
                                  headers=header,
                                  data=data,
                                  verify=False,
+                                 proxies=proxies
                                 )
         response = response.content
         return response

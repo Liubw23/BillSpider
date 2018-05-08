@@ -18,6 +18,13 @@ class ExbillSpider(scrapy.Spider):
     allowed_domains = ['exbill.cn']
     start_urls = ['https://www.exbill.cn/login/userLogin.json']
 
+    custom_settings = {
+        'DOWNLOADER_MIDDLEWARES': {
+                                    'Bill.middlewares.RandomUserAgentMiddleware': 544,
+                                    # 'Bill.middlewares.RandomProxyMiddleware': 545,
+                                  }
+    }
+
     formdata = {
         'loginname': '15902101576',
         'pwd': 'cHIxMjM0NTY='

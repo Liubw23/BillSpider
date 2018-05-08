@@ -73,7 +73,7 @@ class RzlineItem(scrapy.Item):
     F3 = scrapy.Field()
     # 金额
     F4 = scrapy.Field()
-    # 类型, {国股 城商 三农 每十万}
+    # 详细类型, {国股 城商 三农 ...}
     F5 = scrapy.Field()
     # 每十万
     F6 = scrapy.Field()
@@ -87,3 +87,7 @@ class RzlineItem(scrapy.Item):
     F10 = scrapy.Field()
     # 联系方式
     F11 = scrapy.Field()
+    # 电票，大电票，纸票，商票
+    F12 = scrapy.Field()
+    # # 介质
+    # F13 = scrapy.Field

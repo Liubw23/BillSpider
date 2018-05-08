@@ -14,7 +14,7 @@ def perform(inc, sche, spider):
 
 def main(spider):
     sche = sched.scheduler(time.time, time.sleep)
-    interval = 300
+    interval = 60*30
     sche.enter(0, 0, perform, (interval, sche, spider))
     sche.run()  # 开始运行，直到计划时间队列变成空为止
 
@@ -25,9 +25,10 @@ if __name__ == "__main__":
 
     try:
         spider = sys.argv[1]
-        main(spider)
     except Exception as e:
         print('正确启动格式：python start.py 爬虫名')
+        spider = input('请输入爬虫名：')
+    main(spider)
 
 
 

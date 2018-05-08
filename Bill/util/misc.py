@@ -1,6 +1,7 @@
 # coding=utf-8
-import hashlib
 import sys
+import time
+import hashlib
 import traceback
 from Bill.util.send_email import EmailSender
 
@@ -50,8 +51,9 @@ def trace_error(func):
     """
     def wrap(*args, **kwargs):
         try:
-            for i in func(*args, **kwargs):
-                yield i
+            if func(*args, **kwargs):
+                for i in func(*args, **kwargs):
+                    yield i
         except Exception as e:
             # send email
             name = str(func.__qualname__).split('.')[0]
@@ -65,5 +67,11 @@ def trace_error(func):
     return wrap
 
 
+def timestamp_2_date(timestamp):
+    date = time.strftime("%Y%m%d%H%M%S", time.localtime(timestamp))
+    return date
+
+
 if __name__ == '__main__':
-    pass
+    print(timestamp_2_date(1525339077))
+    print(get_uuid('70190995'))

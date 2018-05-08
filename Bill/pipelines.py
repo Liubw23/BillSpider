@@ -71,20 +71,20 @@ class BillPipeline(object):
                                          values(
                                          UNIX_TIMESTAMP(CURRENT_TIMESTAMP)<<32 | RIGHT(UUID_SHORT(),8),
                                          UNIX_TIMESTAMP(CURRENT_TIMESTAMP)<<32 | RIGHT(UUID_SHORT(),8),
-                                         %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',
+                                         %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',
                                          [item['F1'], item['F2'], item['F3'], item['F4'], item['F5'],
                                           item['F6'], item['F7'], item['F8'], item['F9'], item['F10'],
-                                          item['F11'], item['FS'], item['FP'], item['FU']])
+                                          item['F11'],item['F12'], item['FS'], item['FP'], item['FU']])
                 else:
                     print('更新数据')
                     self.cur.execute(r"""update P14003 set 
                                          FV=UNIX_TIMESTAMP(CURRENT_TIMESTAMP)<<32 | RIGHT(UUID_SHORT(),8),
                                          F2=%s, F3=%s, F4=%s, F5=%s, F6=%s, F7=%s, F8=%s,   
-                                         F9=%s, F10=%s, F11=%s, FS=%s, FU=%s
+                                         F9=%s, F10=%s, F11=%s, F12=%s, FS=%s, FU=%s
                                          where F1=%s""",
                                          [item['F2'], item['F3'], item['F4'], item['F5'],
                                           item['F6'], item['F7'], item['F8'], item['F9'],
-                                          item['F10'], item['F11'], item['FS'],
+                                          item['F10'], item['F11'], item['F12'], item['FS'],
                                           datetime.datetime.now().strftime('%Y%m%d%H%M%S'), item['F1']])
                 self.db.commit()
             except Exception as e:

@@ -4,7 +4,7 @@ import json
 import time
 import copy
 
-from Bill.items import BillItem, RzlineItem
+from Bill.items import RzlineItem
 from Bill.util import misc
 from Bill.util.send_email import EmailSender
 
@@ -17,18 +17,31 @@ class RzlineSpider(scrapy.Spider):
     start_urls = ['http://www.rzline.com/web/front/quoteMarket/show']
 
     custom_settings = {
-        "LOG_LEVEL": "INFO"
+        "LOG_LEVEL": "ERROR",
+        'DOWNLOADER_MIDDLEWARES': {
+            'Bill.middlewares.RandomUserAgentMiddleware': 544,
+            'Bill.middlewares.RzlineMiddleware': 546,
+        }
     }
+
 
     # 查询日期
     quoteDate = time.mktime(time.strptime(Today, '%Y%m%d'))
     quoteDate = str(quoteDate).replace('.', '') + '00'
 
     quoteType_list = ['s', 'se', 'b']
+    quoteType_dict = {
+                      'e': '电票',
+                      'se': '小电票',
+                      's': '纸票',
+                      'b': '商票',
+                     }
     kind_dict = {'gg': '国股', 'sh': '城商', 'sn': '三农',
                  'busEle': '电子', 'busPaper': '纸质',
-                 'gq': '国企', 'yq': '央企'}
+                 'gq': '国企', 'yq': '央企',
+                 'ss': '上市公司', 'my': '民营企业'}
     busType_dict = {"1": "买断", "2": "直贴", "0": ""}
+
 
     # 查询条数
     rows = 100
@@ -165,18 +178,21 @@ class RzlineSpider(scrapy.Spider):
                     item['F2'] = F2
 
                     # 机构
-                    detail_type = price['detailType'] if price['detailType'] else ''
-                    if detail_type:
-                        kind = self.kind_dict[detail_type]
-                    else:
-                        kind = ''
                     F3 = data['orgInfoDto']['orgWholename'] if data['orgInfoDto'] else ''
-                    item['F3'] = F3 + ',' + kind if F3 else ''
+                    item['F3'] = F3 if F3 else ''
 
                     # 金额
                     item['F4'] = price['price'] if price['price'] else ''
 
                     # 类型
+                    detail_type = price['detailType'] if price['detailType'] else ''
+                    quote_btype = price['quoteBType'] if price['quoteBType'] else ''
+                    if detail_type in ['gg', 'sh', 'sn']:
+                        kind = self.kind_dict[detail_type]
+                    elif detail_type in ['busEle', 'busPaper']:
+                        kind = self.kind_dict[quote_btype]
+                    else:
+                        kind = ''
                     item['F5'] = kind
 
                     # 每十万
@@ -201,8 +217,17 @@ class RzlineSpider(scrapy.Spider):
                     F11 = data['accountManagerList'][0]['mobPhone'] if data['accountManagerList'] else ''
                     item['F11'] = F11
 
+                    item['F12'] = self.quoteType_dict[response.meta['quoteType']]
+
+                    # if detail_type in ['busEle', 'busPaper']:
+                    #     F13 = self.kind_dict[detail_type]
+                    # else:
+                    #     F13 = ''
+                    # item['F13'] = F13
+
                     # 唯一标识
-                    uu_str = item['F3'] + str(item['F4']) + item['F6'] + item['F7'] + str(item['F8']) + item['F9']
+                    uu_str = item['F3'] + str(item['F4']) + item['F5'] + item['F6'] + item['F7'] + \
+                        str(item['F8']) + item['F9']
                     uu_id = misc.get_uuid(uu_str)
                     item['F1'] = uu_id
 
@@ -214,6 +239,7 @@ class RzlineSpider(scrapy.Spider):
 
                     item['FU'] = int(time.strftime("%Y%m%d%H%M%S"))
 
+                    print(item)
                     yield item
 
                 except Exception as e:
