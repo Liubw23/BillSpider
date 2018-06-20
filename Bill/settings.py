@@ -17,6 +17,7 @@ NEWSPIDER_MODULE = 'Bill.spiders'
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, 'log')
+FILE_DIR = os.path.join(BASE_DIR, 'file')
 
 # User-Agent
 USER_AGENT_LIST = [
@@ -65,11 +66,16 @@ RANDOMIZE_DOWNLOAD_DELAY = True
 
 # 下载最大等待时间
 DOWNLOAD_TIMEOUT = 15
+
 # 重试次数
+RETRY_ENABLED = True
 RETRY_TIMES = 5
+RETRY_HTTP_CODECS = [500, 502, 503, 504, 408, 404]
 
 # 捕获403状态码    默认为空
-HTTPERROR_ALLOWED_CODES = [403]
+HTTPERROR_ALLOWED_CODES = [403, 404]
+
+REDIRECT_ENABLED = False
 
 # The download delay setting will honor only one of:
 #CONCURRENT_REQUESTS_PER_DOMAIN = 16
@@ -98,9 +104,9 @@ HTTPERROR_ALLOWED_CODES = [403]
 DOWNLOADER_MIDDLEWARES = {
    # 'Bill.middlewares.BillDownloaderMiddleware': 543,
     'Bill.middlewares.RandomUserAgentMiddleware': 544,
-    'Bill.middlewares.RandomProxyMiddleware': 545,
-    'Bill.middlewares.RzlineMiddleware': 546,
-    'Bill.middlewares.TcpjwMiddleware': 547,
+    # 'Bill.middlewares.RandomProxyMiddleware': 545,
+    # 'Bill.middlewares.RzlineMiddleware': 546,
+    # 'Bill.middlewares.TcpjwMiddleware': 547,
 }
 
 # Enable or disable extensions

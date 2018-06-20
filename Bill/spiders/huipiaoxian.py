@@ -7,6 +7,7 @@ import scrapy
 from Bill.items import BillItem
 from scrapy.conf import settings
 from Bill.util.misc import trace_error
+Today = time.strftime("%Y%m%d")
 
 
 class HuipiaoxianSpider(scrapy.Spider):
@@ -15,7 +16,7 @@ class HuipiaoxianSpider(scrapy.Spider):
     start_urls = ['http://huipiaoxian.com/']
 
     custom_settings = {
-        # 'LOG_FILE': os.path.join(settings['LOG_DIR'], name + '.txt'),
+        'LOG_FILE': os.path.join(settings['LOG_DIR'], name, Today + '.txt'),
         'DOWNLOADER_MIDDLEWARES': {
             'Bill.middlewares.RandomUserAgentMiddleware': 544,
         }
@@ -39,7 +40,7 @@ class HuipiaoxianSpider(scrapy.Spider):
     @trace_error
     def parse(self, response):
 
-        print('当前页数：', response.meta['p'])
+        self.logger.debug('当前页数：{}'.format(response.meta['p']))
 
         json_data = json.loads(response.text)
         data_list = json_data['data']['listName']
@@ -77,17 +78,15 @@ class HuipiaoxianSpider(scrapy.Spider):
 
             item['F13'] = ''
 
-            item['F14'] = data['contact_phone']
+            item['F14'] = data['contact_phone'] if data['contact_phone'] else ''
 
             # FT, FV, FP, FU, FS
-            item['FS'] = 0 if data['bill_status_code'] != 801 or item['F12'] == '竞价' else 1
+            item['FS'] = 0 if data['bill_status_code'] != 801 or (item['F12'] == '竞价' and item['F14'] == '') else 1
 
             item['FP'] = int(time.strftime("%Y%m%d%H%M%S"))
 
             item['FU'] = int(time.strftime("%Y%m%d%H%M%S"))
 
-            print(item)
-            # self.logger.info('get {item} from {url}'.format(item=item, url=response.url))
             yield item
 
         pages = json_data['data']['page_info']['total_page']

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import json
 import time
 import scrapy
@@ -7,6 +8,7 @@ from urllib.parse import urlencode
 
 from Bill.util import misc
 from Bill.items import BillItem
+from scrapy.conf import settings
 from Bill.util.misc import trace_error
 
 
@@ -20,6 +22,7 @@ class ZaopiaowangSpider(scrapy.Spider):
     start_urls = ['https://www.zaopiaowang.com/']
 
     custom_settings = {
+        'LOG_FILE': os.path.join(settings['LOG_DIR'], name, Today + '.txt'),
         'DOWNLOADER_MIDDLEWARES': {
                                     'Bill.middlewares.RandomUserAgentMiddleware': 544,
                                     # 'Bill.middlewares.RandomProxyMiddleware': 545,
@@ -61,8 +64,8 @@ class ZaopiaowangSpider(scrapy.Spider):
     @trace_error
     def parse(self, response):
         json_data = json.loads(response.text)
-
         if json_data['status'] != "1":
+            self.logger.debug('第{}页爬取异常, 停止爬取!'.format(response.meta['index']))
             return
 
         data_list = eval(json_data['data'])['list']
@@ -73,6 +76,8 @@ class ZaopiaowangSpider(scrapy.Spider):
         values = list()
         for data in data_list:
             print(response.meta['bankType'], '*'*10, n, "*"*10)
+            self.logger.debug('正在爬取{}第{}页第{}条数据!'.format(response.meta['bankType'], response.meta['index'], n))
+
             n += 1
 
             item = BillItem()
@@ -85,6 +90,7 @@ class ZaopiaowangSpider(scrapy.Spider):
             today = item['F2'][:8]
             if today != Today:
                 flag = 0
+                self.logger.debug('第{}页-第{}条-日期{}不为当前日期，停止爬取！'.format(response.meta['index'], n, today))
                 break
 
             item['F3'] = None
@@ -134,7 +140,6 @@ class ZaopiaowangSpider(scrapy.Spider):
 
         for item in values:
             if item['F1'] in s_values:
-                print(item)
                 yield item
 
         if flag:

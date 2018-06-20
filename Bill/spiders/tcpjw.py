@@ -1,16 +1,21 @@
 # -*- coding: utf-8 -*-
-import time
 import re
+import os
+import time
 from urllib.parse import urlencode
+from scrapy.exceptions import CloseSpider
 
 from Bill.items import *
 from Bill.util import misc
+from scrapy.conf import settings
 from Bill.util.misc import trace_error
 from Bill.util.spider_exception import EmptyNodeException
+from Bill.request_spider.tcpjw_login import get_cookie,set_cookie
 
 
 Today = time.strftime("%Y%m%d")
 Year = time.strftime("%Y")
+s_values = set()
 
 
 class TcpjwSpider(scrapy.Spider):
@@ -21,6 +26,7 @@ class TcpjwSpider(scrapy.Spider):
     custom_settings = {
         'DOWNLOAD_DELAY': 3,
         'LOG_LEVEL': 'DEBUG',
+        'LOG_FILE': os.path.join(settings['LOG_DIR'], name, Today + '.txt'),
         'HTTPERROR_ALLOWED_CODES': [400],
         'DOWNLOADER_MIDDLEWARES': {
             'Bill.middlewares.RandomUserAgentMiddleware': 544,
@@ -28,12 +34,9 @@ class TcpjwSpider(scrapy.Spider):
         }
     }
 
-
     headers = {
         "content-type": "application/x-www-form-urlencoded",
-        "cookie": "UserCookie=Id=10013925&UniqId=31a6f2aa-6151-4798-b0ff-deb5cd3e12a1"
-                  "&Name=%e5%8c%85%e5%a4%b4%e5%b8%82%e6%b7%b1%e8%93%9d%e8%b4%b8%e6%98%93%e6%9c%89%e9%99%90%e5%85%ac%e5"
-                  "%8f%b8&Phone=15902101576&Type=2",
+        "cookie": get_cookie(),
     }
 
     # {(国股 大商 城商 三农 村镇):银票, (其它，财务):财票, (其它):商票}
@@ -60,19 +63,23 @@ class TcpjwSpider(scrapy.Spider):
 
     @trace_error
     def parse(self, response):
+        print('response is ', response.status)
         node_list = response.xpath('//*[@id="tb"]/tr')
         if not node_list:
-            raise EmptyNodeException
+            self.logger.debug(' 节点列表1为空')
+            set_cookie()
+            raise EmptyNodeException('节点列表1为空')
 
         count = re.search(r'共 (.*?) 条记录', response.text)
         if count:
             count = count.group(1)
+            self.logger.debug('共{}条数据'.format(count))
             size = 10
             pages = int(count) // size + 1
         else:
             pages = 1
 
-        print('url=', response.url, ' --> 总页数：', pages)
+        self.logger.debug('类型{}总页数{}'.format(response.meta['kind'], pages))
 
         for page in range(1, pages+1):
             formdata = {"pageIdx": "{}".format(page), "pt_bid": response.meta['kind']}
@@ -91,25 +98,25 @@ class TcpjwSpider(scrapy.Spider):
     def parse_detail(self, response):
         node_list = response.xpath('//*[@id="tb"]/tr')
         if not node_list:
-            raise EmptyNodeException
+            self.logger.debug(' 节点列表2为空')
+            set_cookie()
+            self.headers["cookie"] = get_cookie()
+            raise EmptyNodeException('节点列表2为空')
 
         node_list = node_list[:-1]
 
         n = 1
         for node in node_list:
-            print("种类：", str(response.meta['kind']), '*' * 10, '第' + str(response.meta['page']) + '页',  n, '*' * 10)
+            self.logger.debug('{}第{}页第{}条'.format(response.meta['kind'], response.meta['page'], n))
             n += 1
             item = BillItem()
             F2 = node.xpath('td[1]/text()').extract_first()
-            if F2:
-                F2 = Year + F2.replace(' ', '').replace(':', '').replace('.', '') + '00'
-            else:
-                F2 = ''
-            item['F2'] = F2
+            item['F2'] = Year + F2.replace(' ', '').replace(':', '').replace('.', '') + '00' if F2 else ''
 
-            today = F2[:8]
+            today = item['F2'][:8]
             if today != Today:
-                print('日期：', today, F2)
+                self.logger.debug('{}第{}页-第{}条-日期{}不为当前日期，停止爬取！'
+                                  .format(response.meta['kind'], response.meta['page'], n, today))
                 break
 
             item['F3'] = None
@@ -141,7 +148,7 @@ class TcpjwSpider(scrapy.Spider):
                 F9 = F9.replace('\r\n', '').replace('\t', '').replace(' ', '')
                 F10 = F9.split('(剩')[1][:-1] + '天'
                 F9 = F9.split('(剩')[0]
-                F9 = Year + F9.replace('.', '/')[2:]
+                F9 = '20' + F9.replace('.', '/')
             else:
                 F9 = None
                 F10 = None
@@ -174,11 +181,21 @@ class TcpjwSpider(scrapy.Spider):
 
             # FT, FV, FP, FU, FS
             FS = ''.join(node.xpath('td[7]').extract()).replace('\r\n', '').replace(' ', '')
-            item['FS'] = 0 if '交易完成' in FS or '竞价' in item['F12'] else 1
+            item['FS'] = 0 \
+                if '交易完成' in FS \
+                   or '竞价' in item['F12'] \
+                   or '-' in item['F10'] \
+                   or int(item['F10'][:-1]) <= 0 \
+                else 1
 
             item['FP'] = int(time.strftime("%Y%m%d%H%M%S"))
 
             item['FU'] = int(time.strftime("%Y%m%d%H%M%S"))
 
-            print(item)
-            yield item
+            if item['F1'] not in s_values:
+                s_values.add(item['F1'])
+                print(item)
+                yield item
+            else:
+                self.logger.debug('该票据重复: {}'.format(item['F7']))
+                print('该票据{}重复'.format(item['F7']))

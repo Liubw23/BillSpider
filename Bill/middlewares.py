@@ -5,6 +5,7 @@
 # See documentation in:
 # https://doc.scrapy.org/en/latest/topics/spider-middleware.html
 
+import scrapy
 from scrapy import signals
 import random
 import requests
@@ -126,18 +127,31 @@ class RandomProxyMiddleware(object):
         self.cur = self.db.cursor()
 
     def process_request(self, request, spider):
-        self.cur.execute(r"""select * from proxys order by rand() LIMIT 1""")
+        self.cur.execute(r"""select * from proxys WHERE speed < 5 order by rand() LIMIT 1""")
         proxy = self.cur.fetchone()
         ip, port = proxy[1], proxy[2]
         proxys = str(ip) + ':' + str(port)
-        print('proxy：', proxys)
+        print('proxy：', proxys, proxy[5])
         request.meta['proxy'] = r'http://' + proxys
 
     def process_response(self, request, response, spider):
         print('状态：', response.status)
         if response.status != 200:
-            print('无效的proxy: ', request.meta['proxy'])
-        return response
+            proxy = request.meta['proxy']
+            print('无效的proxy: ', proxy)
+            self._delete_proxy(proxy)
+            return request
+        else:
+            return response
+
+    def process_exception(self, request, exception, spider):
+        print("this request {}'s exception is {}".format(request, exception))
+
+    def _delete_proxy(self, proxy):
+        ip_port = proxy.split('//')[1]
+        ip, port = ip_port.split(':')
+        self.cur.execute('delete from proxys where `ip`="{ip}" and `port`="{port}"'.format(ip=ip, port=port))
+        self.db.commit()
 
     def spider_closed(self, spider):
         self.cur.close()
@@ -148,7 +162,7 @@ class RzlineMiddleware(object):
 
     def process_request(self, request, spider):
 
-        if spider.name != 'rzline':
+        if 'rzline' not in spider.name:
             return
         url_list = [
                     'http://www.rzline.com/web/mobuser/market/quoteShow',
@@ -196,11 +210,13 @@ class TcpjwMiddleware(object):
 
     @staticmethod
     def _post(url, header, data, proxy):
+        import urllib3
+        urllib3.disable_warnings()
         proxies = {
             "http": "http://" + proxy.split('//')[1],
             "https": "https://" + proxy.split('//')[1],
         } if proxy else {}
-        print('requests post proxies: ', proxies)
+        # print('requests post proxies: ', proxies)
         response = requests.post(
                                  url=url,
                                  headers=header,

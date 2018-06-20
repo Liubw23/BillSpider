@@ -17,7 +17,7 @@ class CpiaojuSpider(scrapy.Spider):
     start_urls = ['http://www.cpiaoju.com/Draft']
 
     custom_settings = {
-        'LOG_FILE': os.path.join(settings['LOG_DIR'], name + '.txt'),
+        'LOG_FILE': os.path.join(settings['LOG_DIR'], name, Today + '.txt'),
         'DOWNLOADER_MIDDLEWARES': {
                                     'Bill.middlewares.RandomUserAgentMiddleware': 544,
                                     # 'Bill.middlewares.RandomProxyMiddleware': 545,
@@ -34,7 +34,7 @@ class CpiaojuSpider(scrapy.Spider):
     }
 
     def start_requests(self):
-        yield scrapy.Request(url=self.start_urls[0], meta={'page':1})
+        yield scrapy.Request(url=self.start_urls[0], meta={'page': 1})
 
     @trace_error
     def parse(self, response):
@@ -81,7 +81,7 @@ class CpiaojuSpider(scrapy.Spider):
         F8 = '%.2f' % float(F8.replace('万元', ''))
         item['F8'] = F8 + '万'
 
-        F9 = response.xpath('//dt[contains(text(), "出票日期")]/../dd/text()').extract_first()
+        F9 = response.xpath('//dt[contains(text(), "汇票到期日")]/../dd/text()').extract_first()
         F9 = F9.replace('-', '/') if F9 else ''
         item['F9'] = F9
 
@@ -107,7 +107,10 @@ class CpiaojuSpider(scrapy.Spider):
 
         item['FU'] = int(time.strftime("%Y%m%d%H%M%S"))
 
+        print(item)
+
         if F2 != Today:
             self.flag = 0
         else:
+            pass
             yield item

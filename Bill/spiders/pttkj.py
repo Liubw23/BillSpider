@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 import re
+import os
 import json
 import time
 import scrapy
 
 from Bill.items import BillItem
+from scrapy.conf import settings
 from Bill.util.misc import trace_error
 
 Today = time.strftime("%Y%m%d")
@@ -17,6 +19,7 @@ class PttkjSpider(scrapy.Spider):
     start_urls = ['https://www.pttkj.net']
 
     custom_settings = {
+        'LOG_FILE': os.path.join(settings['LOG_DIR'], name, Today + '.txt'),
         'DOWNLOADER_MIDDLEWARES': {
             'Bill.middlewares.RandomUserAgentMiddleware': 544,
             # 'Bill.middlewares.RandomProxyMiddleware': 545,
@@ -30,7 +33,9 @@ class PttkjSpider(scrapy.Spider):
                  "2": ("城商", "银票"),
                  "3": ("三农", "银票"),
                  "4": ("财务公司", "财票"),
-                 "5": ("其它", "商票"),
+                 "5": ("商票", "商票"),
+                 "6": ("村镇", "银票"),
+                 "7": ("外资", "银票"),
                 }
 
     def start_requests(self):
@@ -47,28 +52,30 @@ class PttkjSpider(scrapy.Spider):
         if not data_list:
             return
 
+        self.logger.debug('正在爬取第{}页'.format(response.meta['page']))
+
         n = 1
         flag = 1
         for data in data_list:
-            print('第{}页'.format(response.meta['page']), '*'*10, n, "*"*10)
             n += 1
 
             item = BillItem()
 
-            F2 = data['ywCpxxfbsj'].replace('-', '').replace(':', '').replace(' ', '') if data['ywCpxxfbsj'] else ''
+            F2 = data['ywCpxxfbsj'].replace('/', '').replace(':', '').replace(' ', '') if data['ywCpxxfbsj'] else ''
             item['F2'] = Year + F2 + '00'
 
             today = item['F2'][:8]
             if today != Today:
                 flag = 0
-                print('日期：', today)
+                self.logger.debug('第{}页-第{}条-日期{}不为当前日期，停止爬取！'.format(response.meta['page'], n, today))
                 break
 
             item['F3'] = data['cprqymc'] if data['cprqymc'] else ''
 
             item['F4'] = '出'
 
-            item['F5'] = self.kind_dict[data['ywCpxxCdjglx']][1] if data['ywCpxxCdjglx'] else ''
+            F5 = self.kind_dict[data['ywCpxxCdjglx']][1] if data['ywCpxxCdjglx'] else ''
+            item['F5'] = data.get('pjlx', F5)
 
             item['F7'] = data['ywCpxxCdjg'].replace('*', '') if data['ywCpxxCdjg'] else ''
 
@@ -119,5 +126,4 @@ class PttkjSpider(scrapy.Spider):
         bill_no = re.search('<li>票据号码：(.*?)</li>', data)
         if bill_no:
             item['F1'] = self.name + '+' + bill_no.group(1)
-        print(item)
         yield item

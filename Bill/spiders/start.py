@@ -3,8 +3,10 @@ import os
 import sys
 import sched
 
+
 def func(spider):
     os.system("scrapy crawl {}".format(spider))
+    print('*'*100)
 
 
 def perform(inc, sche, spider):

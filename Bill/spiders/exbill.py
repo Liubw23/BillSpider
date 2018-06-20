@@ -1,16 +1,21 @@
 # -*- coding: utf-8 -*-
 import scrapy
 import re
+import os
 import time
 import json
 import requests
+from scrapy.exceptions import CloseSpider
 
 from Bill.items import *
 from Bill.util import misc
+from scrapy.conf import settings
 from Bill.util.send_email import EmailSender
 from Bill.util.spider_exception import EmptyNodeException
 
 Today = time.strftime("%Y-%m-%d")
+s_values = set()
+user_no_dict = dict()
 
 
 class ExbillSpider(scrapy.Spider):
@@ -19,6 +24,7 @@ class ExbillSpider(scrapy.Spider):
     start_urls = ['https://www.exbill.cn/login/userLogin.json']
 
     custom_settings = {
+        'LOG_FILE': os.path.join(settings['LOG_DIR'], name, Today.replace('-', '') + '.txt'),
         'DOWNLOADER_MIDDLEWARES': {
                                     'Bill.middlewares.RandomUserAgentMiddleware': 544,
                                     # 'Bill.middlewares.RandomProxyMiddleware': 545,
@@ -55,7 +61,8 @@ class ExbillSpider(scrapy.Spider):
         cookies.update(response.meta['cookie'])
 
         user = response.xpath('/html/body/div[1]/div[2]/div/div/a[1]/em[2]/text()').extract_first()
-        print('当前用户：', user)
+        self.logger.debug('当前用户：'.format(user))
+
         url = 'https://www.exbill.cn/purchase/purchaseList.vjson?' \
               'keyWord=&pageNum=1&purchaseType1=1'
 
@@ -63,12 +70,12 @@ class ExbillSpider(scrapy.Spider):
 
     def parse_detail(self, response):
         page = re.search(r'pageNum=(\d+)&', response.url).group(1)
-        print('{}正在爬取第{}页的数据!'.format(self.name, page))
+        self.logger.debug('{}正在爬取第{}页的数据!'.format(self.name, page))
 
         node_list = response.xpath('/html/body/div/ul/li')
 
         if not node_list:
-            print('节点列表为空, 退出程序！')
+            self.logger.debug('节点列表为空, 退出程序！')
             try:
                 raise EmptyNodeException
             except EmptyNodeException as e:
@@ -76,7 +83,7 @@ class ExbillSpider(scrapy.Spider):
                 error_info = misc.get_error_info(str(e))
                 content = '异常位置：' + error_info['pos'] + '\n' + '异常原因：' + error_info['reason']
                 EmailSender().send(title, content)
-                return
+                raise CloseSpider
 
         # 正则
 
@@ -98,8 +105,7 @@ class ExbillSpider(scrapy.Spider):
         for node in node_list:
 
             item = BillItem()
-
-            print('*' * 10, n, '*' * 10)
+            self.logger.debug('正在爬取第{}页第{}条数据'.format(page, n))
             n += 1
 
             raw_data = node.extract()
@@ -108,6 +114,7 @@ class ExbillSpider(scrapy.Spider):
             today = re_today.search(data).group()
             if today != Today:
                 print('日期：', today)
+                self.logger.debug('第{}页-第{}条-日期{}不为当前日期，停止爬取！'.format(page, n, today))
                 flag = 0
                 break
 
@@ -125,21 +132,20 @@ class ExbillSpider(scrapy.Spider):
 
             item['F4'] = '出'
 
-            try:
-                F7 = data.split('***')[0] + ',' + data.split('***')[1][:2]
-            except IndexError:
-                F7 = None
-            item['F7'] = F7
+            F5 = response.xpath('//span[@class="tips"]/text()').extract_first()
+            F5 = F5 if F5 else ''
+            F7 = response.xpath('//span[@class="corname"]/@title').extract_first()
+            F7 = F7.replace('*', '') if F7 else ''
+            item['F7'] = F7 + ',' + F5
 
             try:
-                F5 = data.split('***')[1][:2]
                 if F5 in ['国股', '大商', '城商', '三农', '村镇']:
                     F5 = '银票'
                 elif F5 == '其它' and '财务' in F7:
                     F5 = '财票'
                 else:
                     F5 = '商票'
-            except IndexError:
+            except:
                 F5 = None
             item['F5'] = F5
 
@@ -180,16 +186,18 @@ class ExbillSpider(scrapy.Spider):
 
             item['FU'] = int(time.strftime("%Y%m%d%H%M%S"))
 
-            print(item)
-            values.append(item)
+            if item['F1'] not in s_values:
+                s_values.add(item['F1'])
+                values.append(item)
+            else:
+                self.logger.debug('该票据重复: {}'.format(item['F1'] + item['F7']))
+                print('该票据{}重复'.format(item['F1'] + item['F7']))
 
         for item in values:
-            url = 'https://www.exbill.cn/user/getUserInfo.json?userNo={}'.format(item['F3'])
-            yield scrapy.Request(url,
-                                 callback=self.parse_other,
-                                 meta={'item': item},
-                                 priority=1,
-                                 dont_filter=True)
+            detail_url = 'https://www.exbill.cn/purchase/records/{}.htm'.format(item['F1'])
+            yield scrapy.Request(detail_url, self.parse_name, meta={'item': item})
+
+
         else:
             page = int(page) + 1
 
@@ -198,12 +206,39 @@ class ExbillSpider(scrapy.Spider):
                       'keyWord=&pageNum={pageNum}&purchaseType1=1'.format(pageNum=str(page))
                 yield scrapy.Request(url, callback=self.parse_detail)
 
+    def parse_name(self, response):
+        item = response.meta['item']
+        name = response.xpath('//div[@class="bill-base-bank"]/text()').extract_first()
+        name = name.split('*')[0]
+        name = name.replace(' ', '').replace('小回头', '').replace('大回头', '')
+        kind = item['F7'].split(',')[1]
+        item['F7'] = ','.join((name, kind))
+
+        url = 'https://www.exbill.cn/user/getUserInfo.json?userNo={}'.format(item['F3'])
+        if item['F3'] in user_no_dict:
+            user_no = item['F3']
+            item['F3'] = user_no_dict[user_no][0]
+            item['F14'] = user_no_dict[user_no][1]
+            yield item
+            print(item)
+        else:
+            yield scrapy.Request(url,
+                                 callback=self.parse_other,
+                                 meta={'item': item},
+                                 priority=1,
+                                 dont_filter=True)
+
     def parse_other(self, response):
         item = response.meta['item']
         data = json.loads(response.text)
+        user_no = item['F3']
+
         try:
             item['F3'] = data['result']['userInfo']['name']
             item['F14'] = data['result']['userInfo']['mobile']
+            user_no_dict[user_no] = (item['F3'], item['F14'])
+            yield item
+            print(item)
         except Exception as e:
             item['F3'] = None
             item['F14'] = None
@@ -211,10 +246,4 @@ class ExbillSpider(scrapy.Spider):
             error_info = misc.get_error_info(str(e))
             content = '异常位置：' + error_info['pos'] + '\n' + '异常原因：' + error_info['reason']
             EmailSender().send(title, content)
-            return
-
-        yield item
-
-
-
-
+            raise CloseSpider

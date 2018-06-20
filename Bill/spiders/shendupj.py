@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
-import scrapy
 import time
+import os
+import scrapy
+
 from Bill.items import *
 from Bill.util import misc
+from scrapy.conf import settings
 from Bill.util.misc import trace_error
 
 Today = time.strftime("%Y%m%d")
 Year = time.strftime("%Y")
+s_values = set()
 
 
 class ShendupjSpider(scrapy.Spider):
@@ -16,9 +20,10 @@ class ShendupjSpider(scrapy.Spider):
 
     custom_settings = {
         'LOG_LEVEL': 'DEBUG',
+        'LOG_FILE': os.path.join(settings['LOG_DIR'], name, Today + '.txt'),
         'DOWNLOADER_MIDDLEWARES': {
             'Bill.middlewares.RandomUserAgentMiddleware': 544,
-            # 'Bill.middlewares.RandomProxyMiddleware': 545,
+            'Bill.middlewares.RandomProxyMiddleware': 545,
         }
     }
 
@@ -28,12 +33,15 @@ class ShendupjSpider(scrapy.Spider):
         print('总数量为：', values)
         if not values:
             print('出现异常')
+            self.logger.debug('出现异常, 总数为{}, 停止爬取！'.format(values))
             return
         page_size = 100
         pages = int(values) // page_size + 1
         print('总页数为：', pages)
+        self.logger.debug('总页数为：{}'.format(pages))
         for page in range(1, pages+1):
             print('正在爬取第{}页'.format(page))
+            self.logger.debug('正在爬取第{}页'.format(page))
             url = 'http://www.shendupiaoju.com/inde_draft?pageSize={}&pageNo={}&today=1' \
                   '&draftType=&bankClassification=&expiryDateRange=&amtRange=&draftStatus='\
                   .format(page_size, page)
@@ -49,7 +57,7 @@ class ShendupjSpider(scrapy.Spider):
         node_list = response.xpath('//tr')
 
         if not node_list:
-            print('节点列表为空, 重新发送请求！')
+            self.logger.debug('节点列表为空, 重新发送该url{}的请求！'.format(response.url))
             yield scrapy.Request(response.url,
                                  callback=self.parse_detail,
                                  dont_filter=True,
@@ -62,6 +70,7 @@ class ShendupjSpider(scrapy.Spider):
 
             print('*' * 10, '第'+response.meta['page']+'页', n, '*' * 10)
             n += 1
+            self.logger.debug('正在爬取第{}页第{}条'.format(response.meta['page'], n))
 
             item = BillItem()
 
@@ -143,11 +152,16 @@ class ShendupjSpider(scrapy.Spider):
 
             # FT, FV, FP, FU, FS
             FS = ''.join(node.xpath('td[9]/text()').extract())
-            item['FS'] = 0 if '交易成功' in FS or '竞价' in item['F12'] else 1
+            item['FS'] = 0 if '交易成功' in FS or '竞价' in item['F12'] or '-' in item['F10'] else 1
 
             item['FP'] = int(time.strftime("%Y%m%d%H%M%S"))
 
             item['FU'] = int(time.strftime("%Y%m%d%H%M%S"))
 
-            print(item)
-            yield item
+            if item['F1'] not in s_values:
+                s_values.add(item['F1'])
+                print(item)
+                yield item
+            else:
+                self.logger.debug('该票据重复: {}'.format(item['F7']))
+                print('该票据{}重复'.format(item['F7']))

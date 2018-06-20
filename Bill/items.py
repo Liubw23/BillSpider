@@ -81,13 +81,13 @@ class RzlineItem(scrapy.Item):
     F7 = scrapy.Field()
     # 额度
     F8 = scrapy.Field()
-    # 业务类型
+    # 业务类型(买断，直贴)
     F9 = scrapy.Field()
     # 联系人
     F10 = scrapy.Field()
     # 联系方式
     F11 = scrapy.Field()
-    # 电票，大电票，纸票，商票
+    # 电票，小电票
     F12 = scrapy.Field()
-    # # 介质
-    # F13 = scrapy.Field
+    # 原始业务类型
+    F13 = scrapy.Field()
