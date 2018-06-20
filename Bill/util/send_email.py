@@ -32,5 +32,3 @@ class EmailSender(object):
 
 if __name__ == '__main__':
     pass
-    # EmailSender().send('爬虫名+时间+异常', '爬虫名+异常原因+时间+代码位置')
-
